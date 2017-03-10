@@ -1,0 +1,40 @@
+{
+  "name": "runtime",
+  "version": "1.0.0",
+  "description": "",
+  "main": "index.js",
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "author": "",
+  "license": "ISC",
+  "dependencies": {
+    "gulp": "github:gulpjs/gulp#4.0",
+    "gulp-autoprefixer": "^3.1.1",
+    "gulp-concat": "^2.6.1",
+    "gulp-inline-source": "^3.0.0",
+    "gulp-plumber": "^1.1.0",
+    "gulp-rename": "^1.2.2",
+    "gulp-sourcemaps": "^2.4.1",
+    "gulp-uglify": "^2.1.0",
+    "handlebars": "^4.0.6",
+    "handlebars-helpers": "https://github.com/easywebhub/handlebars-helpers.git",
+    "handlebars-layouts": "^3.1.4",
+    "lunr": "^1.0.0",
+    "metalsmith": "^2.3.0",
+    "metalsmith-category": "git+https://github.com/easywebhub/metalsmith-category.git",
+    "metalsmith-collections": "git+https://github.com/easywebhub/metalsmith-collections.git",
+    "metalsmith-drafts": "0.0.1",
+    "metalsmith-index": "git+https://github.com/easywebhub/metalsmith-index.git",
+    "metalsmith-layouts": "^1.8.0",
+    "metalsmith-lunr": "git+https://github.com/nemesisqp/metasmith-lunr.git",
+    "metalsmith-markdown": "^0.2.1",
+    "metalsmith-matters": "^1.2.0",
+    "metalsmith-metadata-directory": "^1.0.0",
+    "metalsmith-pagination": "^1.4.0",
+    "metalsmith-permalinks": "git+https://github.com/easywebhub/metalsmith-permalinks.git",
+    "metalsmith-tag": "git+https://github.com/easywebhub/metalsmith-tag.git",
+    "moment": "^2.17.1",
+    "yargs": "^7.0.1"
+  }
+}
