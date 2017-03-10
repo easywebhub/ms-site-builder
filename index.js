@@ -51,6 +51,8 @@ const SpawnGitShell = Promise.coroutine(function *(command, args, options) {
     let env = _.assign({}, process.env, options.env || {});
     options.env = env;
     options.env['NODE_PATH'] = Path.join(__dirname, 'runtime', 'node_modules');
+    options.env['PATH'] = options.env['PATH'] || '';
+    options.env['PATH'] += Path.join(__dirname, 'runtime', 'node_modules', '.bin');
 
     return yield SpawnShell(command, args, options);
 });
@@ -108,20 +110,23 @@ const IsRepoExists = Promise.coroutine(function *(repoUrl) {
         (yield IsFolderExists(localRepoGitPath));
 });
 
-const CloneRepository = Promise.coroutine(function *(repoUrl) {
-
+const CloneRepository = Promise.coroutine(function *(repoUrl, branch, localRepoDir) {
+    return yield SpawnGitShell('git', ['clone', '-b', branch, repoUrl, '.'], {cwd: localRepoDir + Path.sep});
 });
 
-const BuildRepository = Promise.coroutine(function *(repoUrl) {
-
+const BuildRepository = Promise.coroutine(function *(localRepoDir) {
+    return yield SpawnGitShell('gulp', ['build', '--production'], {cwd: localRepoDir + Path.sep});
 });
 
-const PushRepository = Promise.coroutine(function *(repoUrl) {
+const PushRepository = Promise.coroutine(function *(repoUrl, remote, branch) {
+    remote = remote || 'origin';
+    branch = branch || 'gh-pages';
 
+    yield SpawnGitShell('git', ['push', '--force', remote, branch], {cwd: localRepoDir + Path.sep})
 });
 
-const PullRepository = Promise.coroutine(function *(repoUrl) {
-
+const PullRepository = Promise.coroutine(function *(localRepoDir) {
+    return yield SpawnGitShell('git', ['pull'], {cwd: localRepoDir + Path.sep})
 });
 
 server.post({

@@ -27,11 +27,5 @@
     "tslib": "^1.6.0"
   },
   "devDependencies": {
-    "@types/bluebird": "^3.0.37",
-    "@types/fs-extra": "0.0.37",
-    "@types/lodash": "^4.14.54",
-    "@types/minimist": "^1.2.0",
-    "@types/node": "^7.0.7",
-    "@types/restify": "^2.0.41"
   }
 }
