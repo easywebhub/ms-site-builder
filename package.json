@@ -4,6 +4,7 @@
   "description": "Microservice build metalsmith website",
   "main": "index.js",
   "scripts": {
+    "start": "node server/server.js",
     "test": "echo \"Error: no test specified\" && exit 1",
     "postinstall": "cd runtime && npm install"
   },
@@ -23,8 +24,7 @@
     "lodash": "^4.17.4",
     "minimist": "^1.2.0",
     "node-restify-validation": "^1.1.1",
-    "restify": "^4.3.0",
-    "tslib": "^1.6.0"
+    "restify": "^4.3.0"
   },
   "devDependencies": {
   }
