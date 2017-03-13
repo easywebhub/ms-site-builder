@@ -48,12 +48,14 @@ server.server.setTimeout(config.timeout, _.noop);
 
 const SpawnGitShell = Promise.coroutine(function *(command, args, options) {
     options = options || {};
-    let env = _.assign({}, process.env, options.env || {});
-    options.env = env;
+    // let env = _.assign({}, process.env);
+    // console.log('env', env);
+    options.env = process.env;
     options.env['NODE_PATH'] = Path.join(__dirname, 'runtime', 'node_modules');
-    options.env['PATH'] = options.env['PATH'] || '';
-    options.env['PATH'] += Path.join(__dirname, 'runtime', 'node_modules', '.bin');
-
+    let pathKey = options.env['Path'] ? 'Path' : 'PATH';
+    options.env[pathKey] = Path.join(__dirname, 'runtime', 'node_modules', '.bin') + ';' + options.env[pathKey];
+    options.env['GIT_SSL_NO_VERIFY'] = true; // bug ssl ca store not found
+    // console.log(`options.env['PATH'`, options.env['PATH']);
     return yield SpawnShell(command, args, options);
 });
 
@@ -103,6 +105,14 @@ const IsFolderExists = Promise.coroutine(function *(localPath) {
     }
 });
 
+const RemoveFolder = Promise.coroutine(function *(dir) {
+    try {
+        FsExtra.removeAsync(dir);
+    } catch (ex) {
+        console.log('RemoveFolder', dir);
+    }
+});
+
 const IsRepoExists = Promise.coroutine(function *(repoUrl) {
     let localRepoPath = GetRepoLocalPath(repoUrl);
     let localRepoGitPath = localRepoPath + Path.sep + '.git';
@@ -110,8 +120,22 @@ const IsRepoExists = Promise.coroutine(function *(repoUrl) {
         (yield IsFolderExists(localRepoGitPath));
 });
 
-const CloneRepository = Promise.coroutine(function *(repoUrl, branch, localRepoDir) {
-    return yield SpawnGitShell('git', ['clone', '-b', branch, repoUrl, '.'], {cwd: localRepoDir + Path.sep});
+const InitRootRepository = Promise.coroutine(function *(repoUrl, branch, localRepoDir) {
+    return yield SpawnGitShell('git', ['clone', '-q', '-b', branch, repoUrl, '.'], {cwd: localRepoDir + Path.sep});
+});
+
+const InitBuildRepository = Promise.coroutine(function *(repoUrl, localRepoDir) {
+    return yield SpawnGitShell('git', ['clone', '-q', '-b', 'gh-pages', repoUrl, 'build'], {cwd: localRepoDir + Path.sep});
+});
+
+const CloneOrUpdateRepository = Promise.coroutine(function *(repoUrl, branch, localRepoDir) {
+    if (yield IsFolderExists(localRepoDir + Path.sep + '.git')) {
+        yield SpawnGitShell('git', ['pull', '-q', '-s', 'recursive', '-Xtheirs'], {cwd: localRepoDir + Path.sep});
+    } else {
+        yield InitRootRepository(repoUrl, branch, localRepoDir);
+        RemoveFolder(localRepoDir + Path.sep + 'build');
+        yield InitBuildRepository(repoUrl, branch, localRepoDir);
+    }
 });
 
 const BuildRepository = Promise.coroutine(function *(localRepoDir) {
@@ -125,10 +149,28 @@ const PushRepository = Promise.coroutine(function *(repoUrl, remote, branch) {
     yield SpawnGitShell('git', ['push', '--force', remote, branch], {cwd: localRepoDir + Path.sep})
 });
 
-const PullRepository = Promise.coroutine(function *(localRepoDir) {
+const PullRepositoryRoot = Promise.coroutine(function *(localRepoDir) {
     return yield SpawnGitShell('git', ['pull'], {cwd: localRepoDir + Path.sep})
 });
 
+const PushRepositoryBuild = Promise.coroutine(function *(localRepoDir) {
+    let buildDir = Path.join(localRepoDir, 'build');
+    yield SpawnGitShell('git', ['checkout', 'gh-pages'], {cwd: buildDir});
+    yield SpawnGitShell('git', ['branch', '--set-upstream-to=origin/gh-pages'], {cwd: buildDir});
+    yield SpawnGitShell('git', ['pull', 'origin', 'gh-pages', '-s', 'recursive', '-X', 'ours'], {cwd: buildDir});
+
+    // add file
+    yield SpawnGitShell('git', ['add', '.'], {cwd: buildDir});
+    // commit
+    let message = (new Date()).toISOString();
+    yield SpawnGitShell('git', ['commit', `-m"${message}"`], {cwd: buildDir});
+    // push
+    yield SpawnGitShell('git', ['push', 'origin', 'HEAD:gh-pages'], {cwd: buildDir});
+});
+
+/**
+ * init repository and it's build folder
+ */
 server.post({
     url: '/init', validation: {
         resources: {
@@ -138,22 +180,33 @@ server.post({
 }, Promise.coroutine(function*(req, res, next) {
     try {
         let repoUrl = req.params.repoUrl;
+        let localRepoDir = GetRepoLocalPath(repoUrl);
+        let buildFolder = Path.join(localRepoDir, 'build');
 
         // check if repo exist and valid
-        if (yield IsRepoExists(repoUrl))
-            return ResponseSuccess(res, 'exists');
-
-        let localRepoDir = GetRepoLocalPath(repoUrl);
-        // remove repos url if exists
-        try {
-            yield FsExtra.removeAsync(localRepoDir);
-        } catch (_) {
+        let isLocaclFolderExists = yield IsFolderExists(localRepoDir);
+        let isBuildFolderExists = yield IsFolderExists(buildFolder);
+        if (isLocaclFolderExists === true &&  isBuildFolderExists === true) {
+            return ResponseSuccess(res, 'exists')
         }
+
+        // remove repos url if exists
+        RemoveFolder(localRepoDir);
         // create folder
-        yield FsExtra.ensureDirAsync(localRepoDir);
-        // git clone
-        let ret = yield SpawnGitShell('git', ['clone', '-b', 'master', repoUrl, '.'], {cwd: localRepoDir + Path.sep})
-        console.log('git init ret', ret);
+        try {
+            yield FsExtra.ensureDirAsync(localRepoDir + Path.sep);
+        } catch(ex) {
+            // console.log('ensureDir failed', ex);
+        }
+        // git clone root
+        let ret = yield InitRootRepository(repoUrl, 'master', localRepoDir);
+        console.log('git init root folder ret', ret);
+
+        // remove build folder
+        RemoveFolder(buildFolder);
+        // git clone build folder
+        ret = yield InitBuildRepository(repoUrl, localRepoDir);
+        console.log('git init build folder ret', ret);
         ResponseSuccess(res, 'ok');
     } catch (ex) {
         console.error(ex);
@@ -161,26 +214,72 @@ server.post({
     }
 }));
 
-server.post('/build', (req, res, next) => {
-    let input = {
-        repoUrl:        '',
-        pushAfterBuild: true,
-        pushBrach:      'gh-pages'
-    };
-    // call init repo
-    // call build
-    // push if pushAfterBuild true
-})
+/**
+ * build
+ * push if asked
+ */
+server.post({
+    url: '/build', validation: {
+        resources: {
+            repoUrl:        {isRequired: true, isUrl: true},
+            pushAfterBuild: {isRequired: false, isBoolean: true},
+            pushBrach:      {isRequired: false, isAlphanumeric: true}
+        }
+    }
+}, Promise.coroutine(function *(req, res, next) {
+    try {
+        let localRepoDir = GetRepoLocalPath(req.params.repoUrl);
+        let pushAfterBuild = !!(req.params.pushAfterBuild);
+        let pushBranch = typeof(req.params.pushBranch) === 'string' ? req.params.pushBranch : '';
 
-server.get('/push', (req, res, next) => {
+        // error if repo not ready
+        let rootDotGitFolder = Path.join(localRepoDir, '.git');
+        let buildFolder = Path.join(localRepoDir, 'build');
+        let buildDotGitFolder = Path.join(localRepoDir, 'build', '.git');
+        if (!(yield IsFolderExists(rootDotGitFolder)) || !(yield IsFolderExists(buildDotGitFolder))) {
+            return ResponseError(res, 'repository is not initialized');
+        }
+
+        // call build
+        let ret = yield SpawnGitShell('gulp', ['build', '--production'], {cwd: localRepoDir});
+        let buildSuccess = ret.indexOf(`Finished '`) != -1;
+        console.log('build ret', ret);
+        console.log('buildSuccess', buildSuccess);
+        // check if push requested
+        if (!pushAfterBuild || pushBranch === '')
+            return ResponseSuccess(res, 'ok');
+        // push
+        ret = yield PushRepositoryBuild(localRepoDir);
+        console.log('push ret', ret);
+        ResponseSuccess(res, 'ok');
+    } catch (ex) {
+        console.log('build repository failed', ex);
+        ResponseError(res, ex);
+    }
+}));
+
+
+server.get({
+    url: '/push', validation: {
+        resources: {
+            repoUrl: {isRequired: true, isUrl: true}
+        }
+    }
+}, Promise.coroutine(function *(req, res, next) {
     let input = {
         repoUrl:   '',
         pushBrach: 'gh-pages'
     };
-    // check if repo exist and valid
-    // if not return false
-    // if valid call push
-})
+
+    try {
+        let localRepoDir = GetRepoLocalPath(req.params.repoUrl);
+        yield PushRepositoryBuild(localRepoDir);
+        ResponseSuccess(res, 'ok');
+    } catch (ex) {
+        console.log('push failed', ex);
+        ResponseError(res, ex);
+    }
+}));
 
 server.listen(config.port, config.host, () => {
     console.info(`${server.name} listening at ${server.url}`);
