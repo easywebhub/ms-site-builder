@@ -241,9 +241,18 @@ server.post({
         }
 
         // call build
-        let ret = yield SpawnGitShell('gulp', ['build', '--production'], {cwd: localRepoDir});
+        let ret = yield SpawnGitShell('gulp', ['--no-color', 'build', '--production'], {cwd: localRepoDir});
         let buildSuccess = ret.indexOf(`Finished '`) != -1;
         console.log('build ret', ret);
+        if (!buildSuccess) {
+            let errorStartIndex = ret.find('Error:');
+            if (errorStartIndex === -1)
+                return ResponseError(res, ret);
+            else {
+                console.log('BUILD ERROR', ret.slice(errorStartIndex + 7));
+                return ResponseError(res, ret.slice(errorStartIndex + 7));
+            }
+        }
         console.log('buildSuccess', buildSuccess);
         // check if push requested
         if (!pushAfterBuild || pushBranch === '')
@@ -253,7 +262,8 @@ server.post({
         console.log('push ret', ret);
         ResponseSuccess(res, 'ok');
     } catch (ex) {
-        console.log('build repository failed', ex);
+        // trim color code from error log
+        ex = ex.replace(/[\u001b\u009b][[()#;?]*(?:[0-9]{1,4}(?:;[0-9]{0,4})*)?[0-9A-ORZcf-nqry=><]/g, '');
         ResponseError(res, ex);
     }
 }));
