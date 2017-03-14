@@ -4,6 +4,7 @@ const Restify = require('restify');
 const RestifyValidation = require('node-restify-validation');
 const Promise = require('bluebird');
 const Minimist = require('minimist');
+const Moment = require('moment');
 const _ = require('lodash');
 const Path = require('path');
 const Fs = Promise.promisifyAll(require('fs'));
@@ -162,10 +163,14 @@ const PushRepositoryBuild = Promise.coroutine(function *(localRepoDir) {
     // add file
     yield SpawnGitShell('git', ['add', '.'], {cwd: buildDir});
     // commit
-    let message = (new Date()).toISOString();
+    // try {
+    let message = Moment().format('YYYY-MM-DD HH:mm:ss');
     yield SpawnGitShell('git', ['commit', `-m"${message}"`], {cwd: buildDir});
+    // } catch (ex) {
+    //     console.log('PushRepositoryBuild exception', ex);
+    // }
     // push
-    yield SpawnGitShell('git', ['push', 'origin', 'HEAD:gh-pages'], {cwd: buildDir});
+    return yield SpawnGitShell('git', ['push', 'origin', 'HEAD:gh-pages'], {cwd: buildDir});
 });
 
 /**
@@ -186,7 +191,7 @@ server.post({
         // check if repo exist and valid
         let isLocaclFolderExists = yield IsFolderExists(localRepoDir);
         let isBuildFolderExists = yield IsFolderExists(buildFolder);
-        if (isLocaclFolderExists === true &&  isBuildFolderExists === true) {
+        if (isLocaclFolderExists === true && isBuildFolderExists === true) {
             return ResponseSuccess(res, 'exists')
         }
 
@@ -195,7 +200,7 @@ server.post({
         // create folder
         try {
             yield FsExtra.ensureDirAsync(localRepoDir + Path.sep);
-        } catch(ex) {
+        } catch (ex) {
             // console.log('ensureDir failed', ex);
         }
         // git clone root
@@ -222,15 +227,18 @@ server.post({
     url: '/build', validation: {
         resources: {
             repoUrl:        {isRequired: true, isUrl: true},
-            pushAfterBuild: {isRequired: false, isBoolean: true},
-            pushBrach:      {isRequired: false, isAlphanumeric: true}
+            pushAfterBuild: {isRequired: false},
+            pushBranch:     {isRequired: false, isAlphanumeric: true}
         }
     }
 }, Promise.coroutine(function *(req, res, next) {
     try {
         let localRepoDir = GetRepoLocalPath(req.params.repoUrl);
-        let pushAfterBuild = !!(req.params.pushAfterBuild);
-        let pushBranch = typeof(req.params.pushBranch) === 'string' ? req.params.pushBranch : '';
+        let pushAfterBuild = req.params.pushAfterBuild;
+        if (pushAfterBuild !== true && pushAfterBuild !== false) {
+            return ResponseError(res, 'pushAfterBuild (INVALID): Invalid boolean');
+        }
+        let pushBranch = typeof(req.params.pushBranch) === 'string' ? req.params.pushBranch : 'gh-pages';
 
         // error if repo not ready
         let rootDotGitFolder = Path.join(localRepoDir, '.git');
@@ -253,7 +261,6 @@ server.post({
                 return ResponseError(res, ret.slice(errorStartIndex + 7));
             }
         }
-        console.log('buildSuccess', buildSuccess);
         // check if push requested
         if (!pushAfterBuild || pushBranch === '')
             return ResponseSuccess(res, 'ok');
@@ -269,23 +276,30 @@ server.post({
 }));
 
 
-server.get({
+server.post({
     url: '/push', validation: {
         resources: {
-            repoUrl: {isRequired: true, isUrl: true}
+            repoUrl:    {isRequired: true, isUrl: true},
+            pushBranch: {isRequired: true, isRegex: /[a-zA-Z0-9\-_]/}
         }
     }
 }, Promise.coroutine(function *(req, res, next) {
-    let input = {
-        repoUrl:   '',
-        pushBrach: 'gh-pages'
-    };
-
     try {
         let localRepoDir = GetRepoLocalPath(req.params.repoUrl);
-        yield PushRepositoryBuild(localRepoDir);
+        let branch = req.params.pushBranch;
+
+        let rootDotGitFolder = Path.join(localRepoDir, '.git');
+        let buildDotGitFolder = Path.join(localRepoDir, 'build', '.git');
+        if (!(yield IsFolderExists(rootDotGitFolder)) || !(yield IsFolderExists(buildDotGitFolder))) {
+            return ResponseError(res, 'repository is not initialized');
+        }
+
+        let ret = yield PushRepositoryBuild(localRepoDir);
+        console.log('push build result', ret);
         ResponseSuccess(res, 'ok');
     } catch (ex) {
+        if (ex.indexOf('working tree clean') !== -1)
+            return ResponseSuccess(res, 'ok');
         console.log('push failed', ex);
         ResponseError(res, ex);
     }

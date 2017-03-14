@@ -23,9 +23,8 @@ module.exports = (command, args, options = {}) => {
         process.on('close', (code) => {
             if (code === 0) {
                 resolve(stdout + stderr);
-            }
-            else {
-                reject(stderr);
+            } else {
+                reject(stdout + stderr);
             }
         });
     });
