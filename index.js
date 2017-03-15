@@ -21,6 +21,11 @@ process.on('uncaughtException', (err) => {
     console.warn('uncaughtException', err);
 })
 
+function DebugLog() {
+    if (!DEBUG) return;
+    console.log.apply(console, arguments);
+}
+
 let config;
 try {
     config = require(CONFIG_FILE);
@@ -51,12 +56,14 @@ const SpawnGitShell = Promise.coroutine(function *(command, args, options) {
     options = options || {};
     // let env = _.assign({}, process.env);
     // console.log('env', env);
+
+    DebugLog('Call Shell cmd', command, args);
+
     options.env = process.env;
     options.env['NODE_PATH'] = Path.join(__dirname, 'runtime', 'node_modules');
     let pathKey = options.env['Path'] ? 'Path' : 'PATH';
     options.env[pathKey] = Path.join(__dirname, 'runtime', 'node_modules', '.bin') + ';' + options.env[pathKey];
     options.env['GIT_SSL_NO_VERIFY'] = true; // bug ssl ca store not found
-    // console.log(`options.env['PATH'`, options.env['PATH']);
     return yield SpawnShell(command, args, options);
 });
 
@@ -110,7 +117,7 @@ const RemoveFolder = Promise.coroutine(function *(dir) {
     try {
         FsExtra.removeAsync(dir);
     } catch (ex) {
-        console.log('RemoveFolder', dir);
+        console.log('RemoveFolder failed', dir);
     }
 });
 
@@ -151,7 +158,8 @@ const PushRepository = Promise.coroutine(function *(repoUrl, remote, branch) {
 });
 
 const PullRepositoryRoot = Promise.coroutine(function *(localRepoDir) {
-    return yield SpawnGitShell('git', ['pull'], {cwd: localRepoDir + Path.sep})
+    yield SpawnGitShell('git', ['fetch', '--all'], {cwd: localRepoDir + Path.sep})
+    return yield SpawnGitShell('git', ['reset', '--hard', 'origin/master'], {cwd: localRepoDir + Path.sep})
 });
 
 const PushRepositoryBuild = Promise.coroutine(function *(localRepoDir) {
@@ -187,6 +195,7 @@ server.post({
         let repoUrl = req.params.repoUrl;
         let localRepoDir = GetRepoLocalPath(repoUrl);
         let buildFolder = Path.join(localRepoDir, 'build');
+        DebugLog('Start handle "init" request, url', repoUrl);
 
         // check if repo exist and valid
         let isLocaclFolderExists = yield IsFolderExists(localRepoDir);
@@ -201,20 +210,19 @@ server.post({
         try {
             yield FsExtra.ensureDirAsync(localRepoDir + Path.sep);
         } catch (ex) {
-            // console.log('ensureDir failed', ex);
         }
         // git clone root
         let ret = yield InitRootRepository(repoUrl, 'master', localRepoDir);
-        console.log('git init root folder ret', ret);
+        DebugLog('git init root folder ret', ret);
 
         // remove build folder
         RemoveFolder(buildFolder);
         // git clone build folder
         ret = yield InitBuildRepository(repoUrl, localRepoDir);
-        console.log('git init build folder ret', ret);
+        DebugLog('git init build folder ret', ret);
         ResponseSuccess(res, 'ok');
     } catch (ex) {
-        console.error(ex);
+        DebugLog('handle init request failed', ex);
         ResponseError(res, ex);
     }
 }));
@@ -228,7 +236,7 @@ server.post({
         resources: {
             repoUrl:        {isRequired: true, isUrl: true},
             pushAfterBuild: {isRequired: false},
-            pushBranch:     {isRequired: false, isAlphanumeric: true}
+            pushBranch:     {isRequired: false, isRegex: /[a-zA-Z0-9\-_]/}
         }
     }
 }, Promise.coroutine(function *(req, res, next) {
@@ -240,6 +248,8 @@ server.post({
         }
         let pushBranch = typeof(req.params.pushBranch) === 'string' ? req.params.pushBranch : 'gh-pages';
 
+        DebugLog('Start handle "build" request, url', req.params.repoUrl, 'pushAfterBuild', pushAfterBuild, 'pushBranch', pushBranch);
+
         // error if repo not ready
         let rootDotGitFolder = Path.join(localRepoDir, '.git');
         let buildFolder = Path.join(localRepoDir, 'build');
@@ -248,16 +258,19 @@ server.post({
             return ResponseError(res, 'repository is not initialized');
         }
 
+        // pull update
+        let ret = yield PullRepositoryRoot(localRepoDir);
+
         // call build
-        let ret = yield SpawnGitShell('gulp', ['--no-color', 'build', '--production'], {cwd: localRepoDir});
+        ret = yield SpawnGitShell('gulp', ['--no-color', 'build', '--production'], {cwd: localRepoDir});
         let buildSuccess = ret.indexOf(`Finished '`) != -1;
-        console.log('build ret', ret);
+        DebugLog('build ret', ret);
         if (!buildSuccess) {
             let errorStartIndex = ret.find('Error:');
-            if (errorStartIndex === -1)
+            if (errorStartIndex === -1) {
                 return ResponseError(res, ret);
-            else {
-                console.log('BUILD ERROR', ret.slice(errorStartIndex + 7));
+            } else {
+                DebugLog('BUILD ERROR', ret.slice(errorStartIndex + 7));
                 return ResponseError(res, ret.slice(errorStartIndex + 7));
             }
         }
@@ -266,9 +279,10 @@ server.post({
             return ResponseSuccess(res, 'ok');
         // push
         ret = yield PushRepositoryBuild(localRepoDir);
-        console.log('push ret', ret);
+        DebugLog('push ret', ret);
         ResponseSuccess(res, 'ok');
     } catch (ex) {
+        ex = ex.toString();
         // trim color code from error log
         ex = ex.replace(/[\u001b\u009b][[()#;?]*(?:[0-9]{1,4}(?:;[0-9]{0,4})*)?[0-9A-ORZcf-nqry=><]/g, '');
         ResponseError(res, ex);
@@ -287,6 +301,7 @@ server.post({
     try {
         let localRepoDir = GetRepoLocalPath(req.params.repoUrl);
         let branch = req.params.pushBranch;
+        DebugLog('Start handle "push" request, url', req.params.repoUrl, 'pushBranch', pushBranch);
 
         let rootDotGitFolder = Path.join(localRepoDir, '.git');
         let buildDotGitFolder = Path.join(localRepoDir, 'build', '.git');
@@ -295,12 +310,12 @@ server.post({
         }
 
         let ret = yield PushRepositoryBuild(localRepoDir);
-        console.log('push build result', ret);
+        DebugLog('push build result', ret);
         ResponseSuccess(res, 'ok');
     } catch (ex) {
         if (ex.indexOf('working tree clean') !== -1)
             return ResponseSuccess(res, 'ok');
-        console.log('push failed', ex);
+        DebugLog('push failed', ex);
         ResponseError(res, ex);
     }
 }));
