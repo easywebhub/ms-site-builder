@@ -23,15 +23,12 @@ Microservice build metalsmith website
 * DEBUG mode `node index.js --debug`
 
 ### API for websites built on ms-site-builder
-
-#### init a new website
 > endpoint: `host:port` on config.js
 
 >> {sourceWebsite} : "https://{username}:{pass}@source.easywebhub.com/{username}/{website-name}.git"
 >> Ví dụ: "https://qq:d65f1c188efa497d2e9d28f1ea83b42625b574b1ec7e98b02db1404a9882faf2@source.easywebhub.com/qq/demo-deploy-github.git"
 
-
-`POST /init `
+#### Call `POST /init ` to init a new website
 
 ```json
 {
