@@ -60,3 +60,23 @@ Microservice build metalsmith website
     "pushBranch": "gh-pages"
 }
 ```
+
+#### Actions
+
+- push source 
+- pull source 
+   - "fetch remote repository"
+   - 2.reset hard all local changes 
+- build source 
+   - 3. build gulp --production
+
+- push  website
+
+- build & push website
+- pull source & build & push website
+- push source & build & push website
+
+- list all Content (.md | .json) from source  
+- getFileContent(string filePath, string website-name) 
+   
+- AddOrEditFile(.md | .json)
