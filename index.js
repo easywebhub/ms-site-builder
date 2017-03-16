@@ -61,6 +61,9 @@ process.env[pathKey] += ';' + Path.join(__dirname, 'runtime', 'node_modules', '.
 process.env['NODE_PATH'] = Path.join(__dirname, 'runtime', 'node_modules');
 process.env['GIT_SSL_NO_VERIFY'] = true; // bug ssl ca store not found
 
+process.env['NAME'] = process.env['GIT_AUTHOR_NAME'] = process.env['GIT_COMMITTER_NAME']= 'builder';
+process.env['ENAIL'] = process.env.['GIT_AUTHOR_EMAIL'] = process.env.['GIT_COMMITTER_EMAIL'] = 'builder@easywebhub.com';
+
 
 const SpawnGitShell = Promise.coroutine(function *(command, args, options) {
     options = options || {};
