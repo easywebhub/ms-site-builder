@@ -174,16 +174,16 @@ const PullRepositoryRoot = Promise.coroutine(function *(localRepoDir) {
 
 const PushRepositoryBuild = Promise.coroutine(function *(localRepoDir) {
     let buildDir = Path.join(localRepoDir, 'build');
-    yield SpawnGitShell('git', ['checkout', 'gh-pages'], {cwd: buildDir});
-    yield SpawnGitShell('git', ['branch', '--set-upstream-to=origin/gh-pages'], {cwd: buildDir});
-    yield SpawnGitShell('git', ['pull', 'origin', 'gh-pages', '-s', 'recursive', '-X', 'ours'], {cwd: buildDir});
+    DebugLog(yield SpawnGitShell('git', ['checkout', 'gh-pages'], {cwd: buildDir}));
+    DebugLog(yield SpawnGitShell('git', ['branch', '--set-upstream-to=origin/gh-pages'], {cwd: buildDir}));
+    DebugLog(yield SpawnGitShell('git', ['pull', 'origin', 'gh-pages', '-s', 'recursive', '-X', 'ours'], {cwd: buildDir}));
 
     // add file
-    yield SpawnGitShell('git', ['add', '.'], {cwd: buildDir});
+    DebugLog(yield SpawnGitShell('git', ['add', '.'], {cwd: buildDir}));
     // commit
     // try {
     let message = Moment().format('YYYY-MM-DD HH:mm:ss');
-    yield SpawnGitShell('git', ['commit', `-m"${message}"`], {cwd: buildDir});
+    DebugLog(yield SpawnGitShell('git', ['commit', `-m"${message}"`], {cwd: buildDir}));
     // } catch (ex) {
     //     console.log('PushRepositoryBuild exception', ex);
     // }
