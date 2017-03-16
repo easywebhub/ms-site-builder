@@ -57,8 +57,8 @@ let pathKey = process.env['Path'] ? 'Path' : 'PATH';
 if (process.env['NVM_BIN']) {
     process.env[pathKey] += ';' + process.env['NVM_BIN'];
 }
-process.env[pathKey] = Path.join(__dirname, 'runtime', 'node_modules', '.bin');
-process.env['NODE_PATH'] = Path.join(__dirname, 'runtime', 'node_modules');
+process.env[pathKey] += ';' + Path.join(__dirname, 'runtime', 'node_modules', '.bin');
+process.env['NODE_PATH'] += Path.join(__dirname, 'runtime', 'node_modules');
 process.env['GIT_SSL_NO_VERIFY'] = true; // bug ssl ca store not found
 
 
