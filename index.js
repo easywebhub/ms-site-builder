@@ -312,7 +312,7 @@ server.post({
     try {
         let localRepoDir = GetRepoLocalPath(req.params.repoUrl);
         let branch = req.params.pushBranch;
-        DebugLog('Start handle "push" request, url', req.params.repoUrl, 'pushBranch', pushBranch);
+        DebugLog('Start handle "push" request, url', req.params.repoUrl, 'pushBranch', req.params.pushBranch);
 
         let rootDotGitFolder = Path.join(localRepoDir, '.git');
         let buildDotGitFolder = Path.join(localRepoDir, 'build', '.git');
