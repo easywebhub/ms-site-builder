@@ -52,24 +52,23 @@ server.use(RestifyValidation.validationPlugin({
 
 server.server.setTimeout(config.timeout, _.noop);
 
+// nvm workaround
+if (process.env['NVM_BIN']) {
+    let pathKey = process.env['Path'] ? 'Path' : 'PATH';
+    process.env[pathKey] += ';' + process.env['NVM_BIN'];
+}
+process.env[pathKey] = Path.join(__dirname, 'runtime', 'node_modules', '.bin');
+process.env['NODE_PATH'] = Path.join(__dirname, 'runtime', 'node_modules');
+process.env['GIT_SSL_NO_VERIFY'] = true; // bug ssl ca store not found
+
+
 const SpawnGitShell = Promise.coroutine(function *(command, args, options) {
     options = options || {};
     // let env = _.assign({}, process.env);
     // console.log('env', env);
 
     DebugLog('Call Shell cmd', command, args);
-
     options.env = process.env;
-    options.env['NODE_PATH'] = Path.join(__dirname, 'runtime', 'node_modules');
-    let pathKey = options.env['Path'] ? 'Path' : 'PATH';
-    options.env[pathKey] = Path.join(__dirname, 'runtime', 'node_modules', '.bin') + ';' + options.env[pathKey];
-
-    // nvm workaround
-    if (options.env['NVM_BIN']) {
-        options.env[pathKey] += ';' + options.env['NVM_BIN'];
-    }
-
-    options.env['GIT_SSL_NO_VERIFY'] = true; // bug ssl ca store not found
     DebugLog('SpawnGitShell options', options);
     return yield SpawnShell(command, args, options);
 });
