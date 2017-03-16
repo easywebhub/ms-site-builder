@@ -324,7 +324,7 @@ server.post({
         DebugLog('push build result', ret);
         ResponseSuccess(res, 'ok');
     } catch (ex) {
-        if (ex.indexOf('working tree clean') !== -1)
+        if (typeof(ex) === 'string' && ex.indexOf('working tree clean') !== -1)
             return ResponseSuccess(res, 'ok');
         DebugLog('push failed', ex);
         ResponseError(res, ex);
