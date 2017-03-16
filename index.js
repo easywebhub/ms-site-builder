@@ -148,7 +148,8 @@ const CloneOrUpdateRepository = Promise.coroutine(function *(repoUrl, branch, lo
 });
 
 const BuildRepository = Promise.coroutine(function *(localRepoDir) {
-    return yield SpawnGitShell('gulp', ['build', '--production'], {cwd: localRepoDir + Path.sep});
+    let gulpPath = Path.join(__dirname, 'runtime', 'node_modules', '.bin', 'gulp');
+    return yield SpawnGitShell(gulpPath, ['build', '--production'], {cwd: localRepoDir + Path.sep});
 });
 
 const PushRepository = Promise.coroutine(function *(repoUrl, remote, branch) {
@@ -263,7 +264,8 @@ server.post({
         let ret = yield PullRepositoryRoot(localRepoDir);
 
         // call build
-        ret = yield SpawnGitShell('gulp', ['--no-color', 'build', '--production'], {cwd: localRepoDir});
+        let gulpPath = Path.join(__dirname, 'runtime', 'node_modules', '.bin', 'gulp');
+        ret = yield SpawnGitShell(gulpPath, ['--no-color', 'build', '--production'], {cwd: localRepoDir});
         let buildSuccess = ret.indexOf(`Finished '`) != -1;
         DebugLog('build ret', ret);
         if (!buildSuccess) {
