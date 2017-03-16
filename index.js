@@ -64,6 +64,7 @@ const SpawnGitShell = Promise.coroutine(function *(command, args, options) {
     let pathKey = options.env['Path'] ? 'Path' : 'PATH';
     options.env[pathKey] = Path.join(__dirname, 'runtime', 'node_modules', '.bin') + ';' + options.env[pathKey];
     options.env['GIT_SSL_NO_VERIFY'] = true; // bug ssl ca store not found
+    DebugLog('SpawnGitShell options', options);
     return yield SpawnShell(command, args, options);
 });
 

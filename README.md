@@ -11,7 +11,7 @@ Microservice build metalsmith website
 
 ### Install
 * clone this repository
-* run `npm install` (auto `npm install` in runtime dir)
+* run `npm install` in root and `npm install` in `runtime` folder
 
 ### Run
 * `node index.js`
