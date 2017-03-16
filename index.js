@@ -53,8 +53,8 @@ server.use(RestifyValidation.validationPlugin({
 server.server.setTimeout(config.timeout, _.noop);
 
 // nvm workaround
+let pathKey = process.env['Path'] ? 'Path' : 'PATH';
 if (process.env['NVM_BIN']) {
-    let pathKey = process.env['Path'] ? 'Path' : 'PATH';
     process.env[pathKey] += ';' + process.env['NVM_BIN'];
 }
 process.env[pathKey] = Path.join(__dirname, 'runtime', 'node_modules', '.bin');
