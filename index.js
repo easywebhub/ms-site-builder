@@ -168,7 +168,7 @@ const PushRepository = Promise.coroutine(function *(repoUrl, remote, branch) {
 });
 
 const PullRepositoryRoot = Promise.coroutine(function *(localRepoDir) {
-    yield SpawnGitShell('git', ['fetch', '--all'], {cwd: localRepoDir + Path.sep})
+    DebugLog(yield SpawnGitShell('git', ['fetch', '--all'], {cwd: localRepoDir + Path.sep}));
     return yield SpawnGitShell('git', ['reset', '--hard', 'origin/master'], {cwd: localRepoDir + Path.sep})
 });
 
@@ -270,6 +270,7 @@ server.post({
 
         // pull update
         let ret = yield PullRepositoryRoot(localRepoDir);
+        DebugLog(ret);
 
         // call build
         let gulpPath = Path.join(__dirname, 'runtime', 'node_modules', '.bin', 'gulp');
@@ -294,6 +295,8 @@ server.post({
         ResponseSuccess(res, 'ok');
     } catch (ex) {
         ex = ex.toString();
+        if (typeof(ex) === 'string' && ex.indexOf('working tree clean') !== -1)
+            return ResponseSuccess(res, 'ok');
         // trim color code from error log
         ex = ex.replace(/[\u001b\u009b][[()#;?]*(?:[0-9]{1,4}(?:;[0-9]{0,4})*)?[0-9A-ORZcf-nqry=><]/g, '');
         ResponseError(res, ex);
