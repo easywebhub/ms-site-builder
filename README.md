@@ -42,22 +42,22 @@ Microservice build metalsmith website
 #### Call API `POST` `/build` to build on server
 ```json
 {
-    "repoUrl": "{sourceWebsite}",
-    "pushAfterBuild": false,
-    "pushBranch": "gh-pages"
+    "repoUrl": "{sourceWebsite}"
 }
 ```
-##### Build process
-1. fetch remote repository
-2. reset hard all local changes
-3. build gulp --production
-4. push build folder to remote
 
-#### call API `POST` `/push` to build then push on server
+#### call API `POST` `/push-src` to push src to remote `master` branch
+```json
+{
+    "repoUrl": "{sourceWebsite}"
+}
+```
+
+#### call API `POST` `/push-built` to push `build` folder remote
 ```json
 {
     "repoUrl": "{sourceWebsite}",
-    "pushBranch": "gh-pages"
+    "pushBranch": "{remoteBranch}" // default to gh-pages
 }
 ```
 
