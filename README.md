@@ -63,8 +63,8 @@ Microservice build metalsmith website
 
 #### Actions
 
-- push source 
-- pull source 
+- push source
+- pull source
    - "fetch remote repository"
    - 2.reset hard all local changes 
 - build source 

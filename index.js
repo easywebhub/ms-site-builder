@@ -5,6 +5,7 @@ const RestifyValidation = require('node-restify-validation');
 const Promise = require('bluebird');
 const Minimist = require('minimist');
 const Moment = require('moment');
+const Mime = require('mime');
 const _ = require('lodash');
 const Path = require('path');
 const Fs = Promise.promisifyAll(require('fs'));
@@ -44,7 +45,18 @@ server.pre(Restify.pre.sanitizePath());
 server.use(Restify.CORS());
 server.use(Restify.authorizationParser());
 server.use(Restify.queryParser());
-server.use(Restify.bodyParser());
+server.use(Restify.bodyParser({
+    maxBodySize:          0,
+    mapParams:            true,
+    mapFiles:             false,
+    overrideParams:       false,
+    multipartFileHandler: function (part) {
+        console.log('part', part);
+        part.on('data', function (data) {
+            /* do something with the multipart file data */
+        });
+    }
+}));
 server.use(RestifyValidation.validationPlugin({
     errorsAsArray: false,
     errorHandler:  Restify.errors.InvalidArgumentError
@@ -472,31 +484,88 @@ server.post({
 }));
 
 // LIST FILE
-server.post({
-    url: '/list-file', validation: {
-        resources: {
-            repoUrl: {isRequired: true, isUrl: true}
-        }
-    }
-}, Promise.coroutine(function *(req, res, next) {
+let ScanDir = Promise.coroutine(function *(siteRoot, dir, ret, filter) {
     try {
+        let files = yield Fs.readdirAsync(dir);
+        for (let name of files) {
+            let fullPath = Path.join(dir, name);
+            let stat = Fs.statSync(fullPath);
 
+            let isDir = stat.isDirectory();
+            if (filter && typeof(filter) === 'function')
+                if (filter(name, isDir) == false)
+                    continue;
+
+            if (isDir) {
+                yield ScanDir(siteRoot, fullPath, ret, filter);
+            } else {
+                ret.push({name: name, path: Path.relative(siteRoot, fullPath).replace(/\\/g, '/')});
+            }
+        }
+        return ret;
+    } catch (_) {
+        return ret;
+    }
+});
+
+const resolvePath = function (input) {
+    let path = input.replace(/\\/g, '/');
+    path = path.replace(/\/?\.\.\/?/g, '/');
+
+    return Path.join(Path.resolve(config.dataPath), path);
+};
+
+server.get(/\/read-dir\/(.*)/, Promise.coroutine(function *(req, res, next) {
+    try {
+        let fullPath = resolvePath(req.params[0]);
+        let files = yield ScanDir('', fullPath, []);
+        ResponseSuccess(res, files);
     } catch (ex) {
         DebugLog('push-built failed', ex);
         ResponseError(res, ex);
     }
 }));
 
-// READ FILE
-server.post({
-    url: '/read-file', validation: {
-        resources: {
-            repoUrl: {isRequired: true, isUrl: true}
-        }
-    }
-}, Promise.coroutine(function *(req, res, next) {
-    try {
 
+// READ FILE
+server.get(/\/read-file\/(.*)/, Promise.coroutine(function *(req, res, next) {
+    try {
+        let fullPath = resolvePath(req.params[0]);
+        let stat;
+        try {
+            stat = yield Fs.statAsync(fullPath);
+        } catch (ex) {
+            next(new ResourceNotFoundError('%s does not exist', req.path()));
+            return;
+        }
+
+        if (!stat.isFile()) {
+            next(new ResourceNotFoundError('%s does not exist', req.path()));
+            return;
+        }
+
+        var stream = Fs.createReadStream(fullPath, {autoClose: true});
+
+        stream.on('open', function () {
+            res.set('Content-Length', stat.size);
+            res.set('Content-Type', Mime.lookup(fullPath));
+            res.set('Last-Modified', stat.mtime);
+
+            res.writeHead(200);
+
+            stream.pipe(res);
+            stream.once('end', function () {
+                next(false);
+            });
+        });
+
+        // res.once('end', function () {
+        //     console.log('srv: responding');
+        //     res.send(204);
+        // });
+        // res.on('error', function(error){
+        //      console.log(error);
+        // })
     } catch (ex) {
         DebugLog('push-built failed', ex);
         ResponseError(res, ex);
@@ -504,15 +573,23 @@ server.post({
 }));
 
 // WRITE FILE
-server.post({
-    url: '/write-file', validation: {
-        resources: {
-            repoUrl: {isRequired: true, isUrl: true}
-        }
-    }
-}, Promise.coroutine(function *(req, res, next) {
+server.post(/\/write-file\/(.*)/, Promise.coroutine(function *(req, res, next) {
     try {
+        let fullPath = resolvePath(req.params[0]);
+        console.log('fullPath', fullPath);
+        let dir = Path.dirname(fullPath);
+        yield FsExtra.ensureDirAsync(dir);
 
+        if (req.body) {
+            yield Fs.writeFileAsync(fullPath, req.body);
+            ResponseSuccess(res, 'ok');
+        } else {
+            let stream = Fs.createWriteStream(fullPath);
+            req.pipe(stream);
+            req.on('end', function () {
+                ResponseSuccess(res, 'ok');
+            });
+        }
     } catch (ex) {
         DebugLog('push-built failed', ex);
         ResponseError(res, ex);
