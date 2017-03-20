@@ -61,6 +61,34 @@ Microservice build metalsmith website
 }
 ```
 
+#### get file list in a directory `GET` `/read-dir/:dir` e.g.
+`http://127.0.0.1:8002/read-dir/qq/demo-deploy-github`
+##### response
+```json
+{
+  "result": [
+    {
+      "name": "COMMIT_EDITMSG",
+      "path": "repositories/qq/demo-deploy-github/.git/COMMIT_EDITMSG"
+    },
+    {
+      "name": "config",
+      "path": "repositories/qq/demo-deploy-github/.git/config"
+    }
+}
+```
+
+#### read file `GET` `/read-dir/:filePath` e.g.
+`http://127.0.0.1:8002/read-file/qq/demo-deploy-github/content/data-files.md`
+##### whole request response is file data
+
+#### write file `POST` `/write-file/:filePath` post data is file content
+`http://127.0.0.1:8002/read-file/qq/demo-deploy-github/content/data-files.md`
+##### response
+```json
+{ "result": "ok" }
+```
+
 #### Actions
 
 - push source 
