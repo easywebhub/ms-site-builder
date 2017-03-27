@@ -42,7 +42,7 @@ const server = Restify.createServer({
 
 server.pre(Restify.pre.userAgentConnection());
 server.pre(Restify.pre.sanitizePath());
-server.use(Restify.CORS());
+server.use(Restify.CORS(['*']));
 server.use(Restify.authorizationParser());
 server.use(Restify.queryParser());
 server.use(Restify.bodyParser({
@@ -483,6 +483,12 @@ server.post({
     }
 }));
 
+function trimRootFolder(dir) {
+    let parts = dir.split('/');
+    parts.shift();
+    return parts.join('/');
+}
+
 // LIST FILE
 let ScanDir = Promise.coroutine(function *(siteRoot, dir, ret, filter) {
     try {
@@ -499,7 +505,10 @@ let ScanDir = Promise.coroutine(function *(siteRoot, dir, ret, filter) {
             if (isDir) {
                 yield ScanDir(siteRoot, fullPath, ret, filter);
             } else {
-                ret.push({name: name, path: Path.relative(siteRoot, fullPath).replace(/\\/g, '/')});
+                ret.push({
+                    name: name,
+                    path: trimRootFolder(Path.relative(siteRoot, fullPath).replace(/\\/g, '/'))
+                });
             }
         }
         return ret;
@@ -535,18 +544,20 @@ server.get(/\/read-file\/(.*)/, Promise.coroutine(function *(req, res, next) {
         try {
             stat = yield Fs.statAsync(fullPath);
         } catch (ex) {
-            next(new ResourceNotFoundError('%s does not exist', req.path()));
+            console.log('404', fullPath);
+            next(new Restify.ResourceNotFoundError('%s does not exist', req.path()));
             return;
         }
 
         if (!stat.isFile()) {
-            next(new ResourceNotFoundError('%s does not exist', req.path()));
+            next(new Restify.ResourceNotFoundError('%s does not exist', req.path()));
             return;
         }
 
         var stream = Fs.createReadStream(fullPath, {autoClose: true});
 
         stream.on('open', function () {
+            console.log('MIME', Mime.lookup(fullPath));
             res.set('Content-Length', stat.size);
             res.set('Content-Type', Mime.lookup(fullPath));
             res.set('Last-Modified', stat.mtime);
@@ -576,7 +587,7 @@ server.get(/\/read-file\/(.*)/, Promise.coroutine(function *(req, res, next) {
 server.post(/\/write-file\/(.*)/, Promise.coroutine(function *(req, res, next) {
     try {
         let fullPath = resolvePath(req.params[0]);
-        console.log('fullPath', fullPath);
+        // console.log('fullPath', fullPath);
         let dir = Path.dirname(fullPath);
         yield FsExtra.ensureDirAsync(dir);
 
