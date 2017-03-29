@@ -557,7 +557,7 @@ server.get(/\/read-file\/(.*)/, Promise.coroutine(function *(req, res, next) {
         var stream = Fs.createReadStream(fullPath, {autoClose: true});
 
         stream.on('open', function () {
-            console.log('MIME', Mime.lookup(fullPath));
+            // console.log('MIME', Mime.lookup(fullPath));
             res.set('Content-Length', stat.size);
             res.set('Content-Type', Mime.lookup(fullPath));
             res.set('Last-Modified', stat.mtime);
