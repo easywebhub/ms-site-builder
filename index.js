@@ -152,152 +152,6 @@ const InitRootRepository = Promise.coroutine(function *(repoUrl, branch, localRe
     return yield SpawnGitShell('git', ['clone', '-q', '-b', branch, repoUrl, '.'], {cwd: localRepoDir + Path.sep});
 });
 
-
-// const CloneOrUpdateRepository = Promise.coroutine(function *(repoUrl, branch, localRepoDir) {
-//     if (yield IsFolderExists(localRepoDir + Path.sep + '.git')) {
-//         yield SpawnGitShell('git', ['pull', '-q', '-s', 'recursive', '-Xtheirs'], {cwd: localRepoDir + Path.sep});
-//     } else {
-//         yield InitRootRepository(repoUrl, branch, localRepoDir);
-//         RemoveFolder(localRepoDir + Path.sep + 'build');
-//         yield InitBuildRepository(repoUrl, branch, localRepoDir);
-//     }
-// });
-
-// const BuildRepository = Promise.coroutine(function *(localRepoDir) {
-//     let gulpPath = Path.join(__dirname, 'runtime', 'node_modules', '.bin', 'gulp');
-//     return yield SpawnGitShell(gulpPath, ['build', '--production'], {cwd: localRepoDir + Path.sep});
-// });
-
-// const PushRepository = Promise.coroutine(function *(repoUrl, remote, branch) {
-//     remote = remote || 'origin';
-//     branch = branch || 'gh-pages';
-//
-//     yield SpawnGitShell('git', ['push', '--force', remote, branch], {cwd: localRepoDir + Path.sep})
-// });
-
-// const PullRepositoryRoot = Promise.coroutine(function *(localRepoDir) {
-//     if (!workDir.endsWith(Path.sep)) workDir += Path.sep;
-//     DebugLog(yield SpawnGitShell('git', ['fetch', '--all'], {cwd: localRepoDir + Path.sep}));
-//     return yield SpawnGitShell('git', ['reset', '--hard', 'origin/master'], {cwd: localRepoDir + Path.sep})
-// });
-
-
-// const PushRepositoryBuild = Promise.coroutine(function *(localRepoDir) {
-//     let buildDir = Path.join(localRepoDir, 'build');
-//     DebugLog(yield SpawnGitShell('git', ['checkout', 'gh-pages'], {cwd: buildDir}));
-//     DebugLog(yield SpawnGitShell('git', ['branch', '--set-upstream-to=origin/gh-pages'], {cwd: buildDir}));
-//     DebugLog(yield SpawnGitShell('git', ['pull', 'origin', 'gh-pages', '-s', 'recursive', '-X', 'ours'], {cwd: buildDir}));
-//
-//     // add file
-//     DebugLog(yield SpawnGitShell('git', ['add', '.'], {cwd: buildDir}));
-//     // commit
-//     // try {
-//     let message = Moment().format('YYYY-MM-DD HH:mm:ss');
-//     DebugLog(yield SpawnGitShell('git', ['commit', `-m"${message}"`], {cwd: buildDir}));
-//     // } catch (ex) {
-//     //     console.log('PushRepositoryBuild exception', ex);
-//     // }
-//     // push
-//     return yield SpawnGitShell('git', ['push', 'origin', 'HEAD:gh-pages'], {cwd: buildDir});
-// });
-//
-// /**
-//  * build
-//  * push if asked
-//  */
-// server.post({
-//     url: '/build', validation: {
-//         resources: {
-//             repoUrl:        {isRequired: true, isUrl: true},
-//             pushAfterBuild: {isRequired: false},
-//             pushBranch:     {isRequired: false, isRegex: /[a-zA-Z0-9\-_]/}
-//         }
-//     }
-// }, Promise.coroutine(function *(req, res, next) {
-//     try {
-//         let localRepoDir = GetRepoLocalPath(req.params.repoUrl);
-//         let pushAfterBuild = req.params.pushAfterBuild;
-//         if (pushAfterBuild !== true && pushAfterBuild !== false) {
-//             return ResponseError(res, 'pushAfterBuild (INVALID): Invalid boolean');
-//         }
-//         let pushBranch = typeof(req.params.pushBranch) === 'string' ? req.params.pushBranch : 'gh-pages';
-//
-//         DebugLog('Start handle "build" request, url', req.params.repoUrl, 'pushAfterBuild', pushAfterBuild, 'pushBranch', pushBranch);
-//
-//         // error if repo not ready
-//         let rootDotGitFolder = Path.join(localRepoDir, '.git');
-//         let buildFolder = Path.join(localRepoDir, 'build');
-//         let buildDotGitFolder = Path.join(localRepoDir, 'build', '.git');
-//         if (!(yield IsFolderExists(rootDotGitFolder)) || !(yield IsFolderExists(buildDotGitFolder))) {
-//             return ResponseError(res, 'repository is not initialized');
-//         }
-//
-//         // pull update
-//         let ret = yield PullRepositoryRoot(localRepoDir);
-//         DebugLog(ret);
-//
-//         // call build
-//         let gulpPath = Path.join(__dirname, 'runtime', 'node_modules', '.bin', 'gulp');
-//         ret = yield SpawnGitShell(gulpPath, ['--no-color', 'build', '--production'], {cwd: localRepoDir});
-//         let buildSuccess = ret.indexOf(`Finished '`) != -1;
-//         DebugLog('build ret', ret);
-//         if (!buildSuccess) {
-//             let errorStartIndex = ret.find('Error:');
-//             if (errorStartIndex === -1) {
-//                 return ResponseError(res, ret);
-//             } else {
-//                 DebugLog('BUILD ERROR', ret.slice(errorStartIndex + 7));
-//                 return ResponseError(res, ret.slice(errorStartIndex + 7));
-//             }
-//         }
-//         // check if push requested
-//         if (!pushAfterBuild || pushBranch === '')
-//             return ResponseSuccess(res, 'ok');
-//         // push
-//         ret = yield PushRepositoryBuild(localRepoDir);
-//         DebugLog('push ret', ret);
-//         ResponseSuccess(res, 'ok');
-//     } catch (ex) {
-//         ex = ex.toString();
-//         if (typeof(ex) === 'string' && ex.indexOf('working tree clean') !== -1)
-//             return ResponseSuccess(res, 'ok');
-//         // trim color code from error log
-//         ex = ex.replace(/[\u001b\u009b][[()#;?]*(?:[0-9]{1,4}(?:;[0-9]{0,4})*)?[0-9A-ORZcf-nqry=><]/g, '');
-//         ResponseError(res, ex);
-//     }
-// }));
-
-
-// server.post({
-//     url: '/push', validation: {
-//         resources: {
-//             repoUrl:    {isRequired: true, isUrl: true},
-//             pushBranch: {isRequired: true, isRegex: /[a-zA-Z0-9\-_]/}
-//         }
-//     }
-// }, Promise.coroutine(function *(req, res, next) {
-//     try {
-//         let localRepoDir = GetRepoLocalPath(req.params.repoUrl);
-//         let branch = req.params.pushBranch;
-//         DebugLog('Start handle "push" request, url', req.params.repoUrl, 'pushBranch', req.params.pushBranch);
-//
-//         let rootDotGitFolder = Path.join(localRepoDir, '.git');
-//         let buildDotGitFolder = Path.join(localRepoDir, 'build', '.git');
-//         if (!(yield IsFolderExists(rootDotGitFolder)) || !(yield IsFolderExists(buildDotGitFolder))) {
-//             return ResponseError(res, 'repository is not initialized');
-//         }
-//
-//         let ret = yield PushRepositoryBuild(localRepoDir);
-//         DebugLog('push build result', ret);
-//         ResponseSuccess(res, 'ok');
-//     } catch (ex) {
-//         if (typeof(ex) === 'string' && ex.indexOf('working tree clean') !== -1)
-//             return ResponseSuccess(res, 'ok');
-//         DebugLog('push failed', ex);
-//         ResponseError(res, ex);
-//     }
-// }));
-
 // NEW CODE START
 const InitBuildRepository = Promise.coroutine(function *(repoUrl, localRepoDir) {
     return yield SpawnGitShell('git', ['clone', '-q', '-b', 'gh-pages', repoUrl, 'build'], {cwd: localRepoDir + Path.sep});
@@ -338,10 +192,10 @@ const PushRepo = Promise.coroutine(function *(workDir, branch) {
     }
 });
 
-const BuildSrc = Promise.coroutine(function *(workDir) {
+const BuildSrc = Promise.coroutine(function *(workDir, task) {
     if (!workDir.endsWith(Path.sep)) workDir += Path.sep;
     let gulpPath = Path.join(__dirname, 'runtime', 'node_modules', '.bin', 'gulp');
-    let ret = yield SpawnGitShell(gulpPath, ['--no-color', 'build', '--production'], {cwd: workDir});
+    let ret = yield SpawnGitShell(gulpPath, ['--no-color', task, '--production'], {cwd: workDir});
     let buildSuccess = ret.indexOf(`Finished '`) != -1;
     if (!buildSuccess) {
         let errorStartIndex = ret.find('Error:');
@@ -422,14 +276,16 @@ server.post({
 server.post({
     url: '/build', validation: {
         resources: {
-            repoUrl: {isRequired: true, isUrl: true}
+            repoUrl: {isRequired: true, isUrl: true},
+            task: {isRequired: false, isIn: ['metalsmith', 'build']}
         }
     }
 }, Promise.coroutine(function *(req, res, next) {
     try {
+        let task = req.params.task || 'build';
         let repoUrl = req.params.repoUrl;
         let localRepoDir = GetRepoLocalPath(repoUrl);
-        DebugLog(yield BuildSrc(localRepoDir));
+        DebugLog(yield BuildSrc(localRepoDir, task));
         ResponseSuccess(res, 'ok');
     } catch (ex) {
         DebugLog('build', ex);
