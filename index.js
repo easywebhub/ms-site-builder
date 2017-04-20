@@ -149,12 +149,16 @@ const IsRepoExists = Promise.coroutine(function *(repoUrl) {
 });
 
 const InitRootRepository = Promise.coroutine(function *(repoUrl, branch, localRepoDir) {
-    return yield SpawnGitShell('git', ['clone', '-q', '-b', branch, repoUrl, '.'], {cwd: localRepoDir + Path.sep});
+    if (!localRepoDir.endsWith(Path.sep))
+        localRepoDir += Path.sep;
+    return yield SpawnGitShell('git', ['clone', '-q', '-b', branch, repoUrl, '.'], {cwd: localRepoDir});
 });
 
 // NEW CODE START
 const InitBuildRepository = Promise.coroutine(function *(repoUrl, localRepoDir) {
-    return yield SpawnGitShell('git', ['clone', '-q', '-b', 'gh-pages', repoUrl, 'build'], {cwd: localRepoDir + Path.sep});
+    if (!localRepoDir.endsWith(Path.sep))
+        localRepoDir += Path.sep;
+    return yield SpawnGitShell('git', ['clone', '-q', '-b', 'gh-pages', repoUrl, 'build'], {cwd: localRepoDir});
 });
 
 const checkRepoInitialized = Promise.coroutine(function*(localRepoDir) {
@@ -226,7 +230,7 @@ server.post({
         let isLocaclFolderExists = yield IsFolderExists(localRepoDir);
         let isBuildFolderExists = yield IsFolderExists(buildFolder);
         if (isLocaclFolderExists === true && isBuildFolderExists === true) {
-            return ResponseSuccess(res, 'exists')
+            return ResponseSuccess(res, 'exists');
         }
 
         // remove repos url if exists
@@ -236,16 +240,25 @@ server.post({
             yield FsExtra.ensureDirAsync(localRepoDir + Path.sep);
         } catch (ex) {
         }
-        // git clone root
-        let ret = yield InitRootRepository(repoUrl, 'master', localRepoDir);
-        DebugLog('git init root folder ret', ret);
 
-        // remove build folder
-        RemoveFolder(buildFolder);
-        // git clone build folder
-        ret = yield InitBuildRepository(repoUrl, localRepoDir);
-        DebugLog('git init build folder ret', ret);
-        ResponseSuccess(res, 'ok');
+        // parallel clone root and build folder
+        // git clone root
+        let tasks = [
+            InitRootRepository(repoUrl, 'master', localRepoDir), // init root folder
+        ];
+        // delay a bit for folder to be created
+        tasks.push(InitBuildRepository(repoUrl, localRepoDir)); // clone build folder
+
+        Promise.all(tasks).then(resp => {
+            DebugLog('git init root and build folder success', resp);
+            ResponseSuccess(res, 'ok');
+        }).catch(err => {
+            DebugLog('git init root and build folder failed', err);
+            ResponseError(res, err);
+        })
+
+        // remove build folder, không cần thiết nếu template đúng chuẩn
+        // RemoveFolder(buildFolder);
     } catch (ex) {
         DebugLog('init failed', ex);
         ResponseError(res, ex);
@@ -277,7 +290,7 @@ server.post({
     url: '/build', validation: {
         resources: {
             repoUrl: {isRequired: true, isUrl: true},
-            task: {isRequired: false, isIn: ['metalsmith', 'build']}
+            task:    {isRequired: false, isIn: ['metalsmith', 'build']}
         }
     }
 }, Promise.coroutine(function *(req, res, next) {
