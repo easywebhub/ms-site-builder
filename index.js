@@ -15,7 +15,6 @@ const Url = require('url');
 
 const DEBUG = /--debug/.test(process.argv.toString());
 const argv = Minimist(process.argv.slice(2));
-const CONFIG_FILE = argv.config || './config.js';
 const AppInfo = JSON.parse(Fs.readFileSync('package.json'));
 
 process.on('uncaughtException', (err) => {
@@ -27,13 +26,10 @@ function DebugLog() {
     console.log.apply(console, arguments);
 }
 
-let config;
-try {
-    config = require(CONFIG_FILE);
-} catch (error) {
-    console.error('load config failed', error.message);
-    process.exit(1);
-}
+const PORT = argv.port || process.env.SERVER_PORT || 7000;
+const HOST = argv.host || process.env.SERVER_HOST || '127.0.0.1';
+const TIMEOUT = argv.timeout || process.env.TIMEOUT || 300000;
+const DATA_PATH = argv.dataPath || process.env.DATA_PATH || 'repositories';
 
 const server = Restify.createServer({
     name:    AppInfo.name,
@@ -62,7 +58,7 @@ server.use(RestifyValidation.validationPlugin({
     errorHandler:  Restify.errors.InvalidArgumentError
 }));
 
-server.server.setTimeout(config.timeout, _.noop);
+server.server.setTimeout(TIMEOUT, _.noop);
 
 // nvm workaround
 let pathKey = process.env['Path'] ? 'Path' : 'PATH';
@@ -121,7 +117,7 @@ const GetRepoInfo = function (repoUrl) {
 
 const GetRepoLocalPath = function (repoUrl) {
     let info = GetRepoInfo(repoUrl);
-    return Path.resolve(Path.join(config.dataPath, info.group, info.project)) + Path.sep;
+    return Path.resolve(Path.join(DATA_PATH, info.group, info.project)) + Path.sep;
 };
 
 const IsFolderExists = Promise.coroutine(function *(localPath) {
@@ -390,7 +386,7 @@ const resolvePath = function (input) {
     let path = input.replace(/\\/g, '/');
     path = path.replace(/\/?\.\.\/?/g, '/');
 
-    return Path.join(Path.resolve(config.dataPath), path);
+    return Path.join(Path.resolve(DATA_PATH), path);
 };
 
 server.get(/\/read-dir\/(.*)/, Promise.coroutine(function *(req, res, next) {
@@ -476,6 +472,6 @@ server.post(/\/write-file\/(.*)/, Promise.coroutine(function *(req, res, next) {
     }
 }));
 
-server.listen(config.port, config.host, () => {
+server.listen(PORT, HOST, () => {
     console.info(`${server.name} listening at ${server.url}`);
 });
